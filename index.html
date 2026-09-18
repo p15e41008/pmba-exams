@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>財務管理考古題刷題系統 (含錯題複習版)</title>
+  <title>PM 學程考古題刷題系統</title>
+  <!-- 這是同學之間共用的練習站，不希望被搜尋引擎收錄 -->
+  <meta name="robots" content="noindex, nofollow">
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Marked.js (Markdown 解析) -->
@@ -75,7 +77,55 @@
     #practiceSetupModal > div, #sessionSummaryModal > div { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
   </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col font-sans">
+<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col font-sans overflow-hidden">
+
+  <!-- 進站門簾：同學之間共用的密碼提示。
+       這不是身份驗證機制，密碼刻意以明文寫在下方。
+       原因與被否決的替代方案見 docs/adr/0001-static-password-is-a-curtain-not-a-lock.md -->
+  <div id="gateOverlay" class="fixed inset-0 z-[100] bg-indigo-900 flex items-center justify-center px-6">
+    <div class="w-full max-w-sm text-center text-white">
+      <i class="fa-solid fa-graduation-cap text-4xl text-yellow-300 mb-4"></i>
+      <h1 class="text-xl font-bold tracking-wide mb-1">PM 學程考古題刷題系統</h1>
+      <p class="text-sm text-indigo-200 mb-6">這是 PMBA 同學之間共用的練習站，請輸入班上的共用密碼。</p>
+      <input type="password" id="gateInput" autofocus inputmode="text" placeholder="共用密碼"
+             onkeydown="if (event.key === 'Enter') submitGate()"
+             class="w-full bg-indigo-950/60 border border-indigo-400 rounded-lg px-4 py-3 text-center text-white placeholder-indigo-300 focus:outline-none focus:ring-2 focus:ring-yellow-300">
+      <p id="gateError" class="hidden text-sm text-rose-300 mt-3"><i class="fa-solid fa-circle-exclamation"></i> 密碼不對，請再試一次。</p>
+      <button onclick="submitGate()" class="w-full mt-5 bg-yellow-400 hover:bg-yellow-300 text-indigo-900 font-bold px-4 py-3 rounded-lg transition">
+        進入
+      </button>
+      <p class="text-xs text-indigo-300 mt-5">輸入過一次後，這台裝置的這個瀏覽器就不會再問。</p>
+    </div>
+  </div>
+
+  <script>
+    // 門簾密碼。明文是刻意的（見 docs/adr/0001）：站台是公開 repo 上的靜態頁面，
+    // 密碼必然被使用者拿得到，它的作用是禮貌性的邊界，而非防護。
+    const GATE_PASSWORD = 'jimishandsome';
+    const GATE_KEY = 'pmba_gate_passed_v1';
+
+    function openGate() {
+      const overlay = document.getElementById('gateOverlay');
+      if (overlay) overlay.remove();
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    function submitGate() {
+      const input = document.getElementById('gateInput');
+      if (input.value.trim() === GATE_PASSWORD) {
+        try { localStorage.setItem(GATE_KEY, '1'); } catch (e) {}
+        openGate();
+      } else {
+        document.getElementById('gateError').classList.remove('hidden');
+        input.select();
+      }
+    }
+
+    // 隱私模式或瀏覽器封鎖 storage 時讀不到紀錄，就照常顯示門簾。
+    try {
+      if (localStorage.getItem(GATE_KEY) === '1') openGate();
+    } catch (e) {}
+  </script>
 
   <!-- Header 導覽列 -->
   <header class="bg-indigo-700 text-white shadow-md">
