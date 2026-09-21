@@ -134,8 +134,8 @@
         <i class="fa-solid fa-graduation-cap text-2xl text-yellow-300 shrink-0"></i>
         <div>
           <h1 class="text-lg sm:text-xl font-bold tracking-wide">PM 學程考古題刷題系統</h1>
-          <!-- 科目切換器：選項由題庫資料自動長出來，多一科只要多丟一份 Excel -->
-          <select id="subjectSwitcher" onchange="switchSubject(this.value)" title="切換科目"
+          <!-- 題庫切換器：選項由 EXCEL_SOURCES 長出來，多一個題庫只要多丟一份 Excel 並加一行設定 -->
+          <select id="subjectSwitcher" onchange="switchSubject(this.value)" title="切換題庫"
                   class="mt-1.5 bg-indigo-800 border border-indigo-500 text-white text-sm font-bold rounded-lg pl-2 pr-1 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-yellow-300">
           </select>
           <div id="importTimestamp" class="text-xs text-indigo-200 mt-1"><i class="fa-solid fa-spinner fa-spin"></i> 題庫載入中...</div>
@@ -164,7 +164,7 @@
           <i class="fa-solid fa-filter text-indigo-600"></i> 考古題條件篩選
         </h2>
         <!-- 6 欄篩選網格 -->
-        <!-- 科目不在這裡篩選：左上角的科目切換器就是它，同一件事不放兩個控制項 -->
+        <!-- 題庫不在這裡篩選：左上角的題庫切換器就是它，同一件事不放兩個控制項 -->
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           <div>
             <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">考古題 / 試卷日期</label>
@@ -615,14 +615,15 @@
 
   <script>
     // ==== 題庫來源設定 ====
-    // 每個科目一份 Excel，都必須與這個 HTML 放在同一個 GitHub Pages 資料夾。
-    // 要新增科目：把 Excel 丟進同資料夾，然後在這裡加一行；畫面上的科目切換器會自己長出來。
-    // subject 有三個用途：Excel 缺少「課程」欄時的備援值、科目切換器的排序依據
-    // （清單第一個就是新訪客的預設科目）、以及讀取失敗時狀態列顯示的科目名。
-    // 正常情況下畫面上的科目名稱以 Excel 的「課程」欄內容為準。
+    // 每個題庫一份 Excel，都必須與這個 HTML 放在同一個 GitHub Pages 資料夾。
+    // 要新增題庫：把 Excel 丟進同資料夾，然後在這裡加一行；畫面上的切換器會自己長出來。
+    // subject 就是切換器上顯示的題庫名稱，一律以這裡為準、不讀 Excel 的「課程」欄——
+    // 同一科可以拆成好幾個題庫（行銷-期中／行銷-期末），而它們的「課程」欄都寫「行銷管理」。
+    // 清單順序就是切換器的排序，第一個是新訪客的預設題庫。
     const EXCEL_SOURCES = [
       { subject: '財務管理', file: '財務管理考古題.xlsx' },
-      { subject: '行銷管理', file: '行銷管理考古題.xlsx' },
+      { subject: '行銷-期中', file: '行銷管理_期中猜題.xlsx' },
+      { subject: '行銷-期末', file: '行銷管理_期末猜題_L4_L6(無助教複習影片).xlsx' },
     ];
     // 目前選定的科目；空字串代表還沒決定（載入題庫後會自動選第一科）。
     const SUBJECT_KEY = 'pmba_last_subject_v1';
@@ -853,6 +854,7 @@
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
             const { newQuestions } = mapRowsToQuestions(jsonData, null, src.subject);
             if (newQuestions.length === 0) throw new Error('內容為空或找不到「題目」欄位');
+            newQuestions.forEach(q => { q.course = src.subject; });
             collected.push(...newQuestions);
           } catch (e) {
             console.warn(`讀取 ${src.file} 失敗：`, e);
