@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>財務管理考古題刷題系統 (含錯題複習版)</title>
+  <title>PM 學程考古題刷題系統</title>
+  <!-- 這是同學之間共用的練習站，不希望被搜尋引擎收錄 -->
+  <meta name="robots" content="noindex, nofollow">
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Marked.js (Markdown 解析) -->
@@ -75,7 +77,55 @@
     #practiceSetupModal > div, #sessionSummaryModal > div { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
   </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col font-sans">
+<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col font-sans overflow-hidden">
+
+  <!-- 進站門簾：同學之間共用的密碼提示。
+       這不是身份驗證機制，密碼刻意以明文寫在下方。
+       原因與被否決的替代方案見 docs/adr/0001-static-password-is-a-curtain-not-a-lock.md -->
+  <div id="gateOverlay" class="fixed inset-0 z-[100] bg-indigo-900 flex items-center justify-center px-6">
+    <div class="w-full max-w-sm text-center text-white">
+      <i class="fa-solid fa-graduation-cap text-4xl text-yellow-300 mb-4"></i>
+      <h1 class="text-xl font-bold tracking-wide mb-1">PM 學程考古題刷題系統</h1>
+      <p class="text-sm text-indigo-200 mb-6">這是 PMBA 同學之間共用的練習站，請輸入班上的共用密碼。</p>
+      <input type="password" id="gateInput" autofocus inputmode="text" placeholder="共用密碼"
+             onkeydown="if (event.key === 'Enter') submitGate()"
+             class="w-full bg-indigo-950/60 border border-indigo-400 rounded-lg px-4 py-3 text-center text-white placeholder-indigo-300 focus:outline-none focus:ring-2 focus:ring-yellow-300">
+      <p id="gateError" class="hidden text-sm text-rose-300 mt-3"><i class="fa-solid fa-circle-exclamation"></i> 密碼不對，請再試一次。</p>
+      <button onclick="submitGate()" class="w-full mt-5 bg-yellow-400 hover:bg-yellow-300 text-indigo-900 font-bold px-4 py-3 rounded-lg transition">
+        進入
+      </button>
+      <p class="text-xs text-indigo-300 mt-5">輸入過一次後，這台裝置的這個瀏覽器就不會再問。</p>
+    </div>
+  </div>
+
+  <script>
+    // 門簾密碼。明文是刻意的（見 docs/adr/0001）：站台是公開 repo 上的靜態頁面，
+    // 密碼必然被使用者拿得到，它的作用是禮貌性的邊界，而非防護。
+    const GATE_PASSWORD = 'jimishandsome';
+    const GATE_KEY = 'pmba_gate_passed_v1';
+
+    function openGate() {
+      const overlay = document.getElementById('gateOverlay');
+      if (overlay) overlay.remove();
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    function submitGate() {
+      const input = document.getElementById('gateInput');
+      if (input.value.trim() === GATE_PASSWORD) {
+        try { localStorage.setItem(GATE_KEY, '1'); } catch (e) {}
+        openGate();
+      } else {
+        document.getElementById('gateError').classList.remove('hidden');
+        input.select();
+      }
+    }
+
+    // 隱私模式或瀏覽器封鎖 storage 時讀不到紀錄，就照常顯示門簾。
+    try {
+      if (localStorage.getItem(GATE_KEY) === '1') openGate();
+    } catch (e) {}
+  </script>
 
   <!-- Header 導覽列 -->
   <header class="bg-indigo-700 text-white shadow-md">
@@ -83,8 +133,12 @@
       <div class="flex items-center space-x-2.5 sm:space-x-3">
         <i class="fa-solid fa-graduation-cap text-2xl text-yellow-300 shrink-0"></i>
         <div>
-          <h1 class="text-lg sm:text-xl font-bold tracking-wide">財務管理考古題刷題系統</h1>
-          <div id="importTimestamp" class="text-xs text-indigo-200 mt-0.5"><i class="fa-solid fa-spinner fa-spin"></i> 題庫載入中...</div>
+          <h1 class="text-lg sm:text-xl font-bold tracking-wide">PM 學程考古題刷題系統</h1>
+          <!-- 科目切換器：選項由題庫資料自動長出來，多一科只要多丟一份 Excel -->
+          <select id="subjectSwitcher" onchange="switchSubject(this.value)" title="切換科目"
+                  class="mt-1.5 bg-indigo-800 border border-indigo-500 text-white text-sm font-bold rounded-lg pl-2 pr-1 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-yellow-300">
+          </select>
+          <div id="importTimestamp" class="text-xs text-indigo-200 mt-1"><i class="fa-solid fa-spinner fa-spin"></i> 題庫載入中...</div>
         </div>
       </div>
       <div class="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto justify-end">
@@ -110,13 +164,8 @@
           <i class="fa-solid fa-filter text-indigo-600"></i> 考古題條件篩選
         </h2>
         <!-- 6 欄篩選網格 -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">課程名稱</label>
-            <select id="filterCourse" onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <option value="">全部課程</option>
-            </select>
-          </div>
+        <!-- 科目不在這裡篩選：左上角的科目切換器就是它，同一件事不放兩個控制項 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           <div>
             <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">考古題 / 試卷日期</label>
             <select id="filterExam" onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -304,7 +353,7 @@
           <div class="flex flex-wrap justify-between items-center text-xs text-indigo-300 font-medium mb-2.5 gap-2">
             <!-- 頂部標籤群 -->
             <div class="flex flex-wrap items-center gap-1.5">
-              <span id="cardCourseBadge" class="bg-indigo-900/80 border border-indigo-700 px-2 py-0.5 rounded-full text-xs">課程</span>
+              <span id="cardCourseBadge" class="bg-indigo-900/80 border border-indigo-700 px-2 py-0.5 rounded-full text-xs">科目</span>
               <span id="cardExamBadge" class="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full text-xs">考題</span>
               <span id="cardChapterBadge" class="bg-blue-900/80 border border-blue-600 text-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1 text-xs">
                 <i class="fa-solid fa-book"></i> <span id="cardChapterText">章節</span>
@@ -566,8 +615,21 @@
 
   <script>
     // ==== 題庫來源設定 ====
-    // 預設 Excel 必須與這個 HTML 放在同一個 GitHub Pages 資料夾。
-    const EXCEL_FILE_URL = '財務管理考古題.xlsx';
+    // 每個科目一份 Excel，都必須與這個 HTML 放在同一個 GitHub Pages 資料夾。
+    // 要新增科目：把 Excel 丟進同資料夾，然後在這裡加一行；畫面上的科目切換器會自己長出來。
+    // subject 有三個用途：Excel 缺少「課程」欄時的備援值、科目切換器的排序依據
+    // （清單第一個就是新訪客的預設科目）、以及讀取失敗時狀態列顯示的科目名。
+    // 正常情況下畫面上的科目名稱以 Excel 的「課程」欄內容為準。
+    const EXCEL_SOURCES = [
+      { subject: '財務管理', file: '財務管理考古題.xlsx' },
+      { subject: '行銷管理', file: '行銷管理考古題.xlsx' },
+    ];
+    // 目前選定的科目；空字串代表還沒決定（載入題庫後會自動選第一科）。
+    const SUBJECT_KEY = 'pmba_last_subject_v1';
+    let currentSubject = '';
+
+    // 注意：以下三個 storage 鍵名沿用單科時代的 fin_management_ 前綴。
+    // 名稱已不精確，但改名會讓同學手上既有的複習標記與作答紀錄全部失效，不值得。
     const QUESTION_CACHE_KEY = 'fin_management_questions_v1_5';
     const QUESTION_TIME_KEY = 'fin_management_questions_time';
     const QUESTION_SOURCE_KEY = 'fin_management_questions_source';
@@ -622,6 +684,9 @@
         try { completedSet = new Set(JSON.parse(savedCompleted)); } catch(e) { completedSet = new Set(); }
       }
 
+      // 回到上次看的科目；讀不到就等 populateFilters 自動選第一科。
+      try { currentSubject = localStorage.getItem(SUBJECT_KEY) || ''; } catch(e) { currentSubject = ''; }
+
       const savedData = localStorage.getItem(QUESTION_CACHE_KEY);
       const savedTime = localStorage.getItem(QUESTION_TIME_KEY);
       let source = localStorage.getItem(QUESTION_SOURCE_KEY);
@@ -658,7 +723,7 @@
     };
 
     // 共用的 Excel 欄位對應邏輯：線上預設題庫與手動匯入使用同一套解析規則。
-    function mapRowsToQuestions(jsonData, oldExpMap = null) {
+    function mapRowsToQuestions(jsonData, oldExpMap = null, defaultCourse = '未分類') {
       let updatedExpCount = 0;
       const newQuestions = jsonData.map((row, index) => {
         const rowKeys = Object.keys(row);
@@ -672,7 +737,7 @@
           return null;
         };
 
-        const courseVal = findValue(['課程', '科目']) || '財務管理';
+        const courseVal = findValue(['課程', '科目']) || defaultCourse;
         const examVal = findValue(['考古題', '試卷', '考試日期', '年份', '日期']) || '未分類';
         const chapterVal = findValue(['對應講義章節', '講義章節', '章節', 'Chapter']) || '';
         const topicVal = findValue(['核心主題', '主題', '主題分類', 'Topic']) || '';
@@ -758,42 +823,58 @@
       statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 正在讀取線上題庫…';
 
       try {
-        const url = encodeURI(EXCEL_FILE_URL) + '?t=' + Date.now();
-        const resp = await fetch(url, { cache: 'no-store' });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        // 每科一份 Excel，逐份抓取後合成同一個題庫。
+        // 某一科讀取失敗不會拖垮其他科，只在狀態列標示是哪一科沒讀到。
+        const collected = [];
+        const failedSubjects = [];
 
-        const buf = await resp.arrayBuffer();
-        const workbook = XLSX.read(new Uint8Array(buf), { type: 'array' });
+        for (const src of EXCEL_SOURCES) {
+          try {
+            const resp = await fetch(encodeURI(src.file) + '?t=' + Date.now(), { cache: 'no-store' });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
-        let worksheet = null;
-        for (const name of workbook.SheetNames) {
-          const sheet = workbook.Sheets[name];
-          const testJson = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-          if (testJson && testJson.length > 0) {
-            worksheet = sheet;
-            break;
+            const buf = await resp.arrayBuffer();
+            const workbook = XLSX.read(new Uint8Array(buf), { type: 'array' });
+
+            let worksheet = null;
+            for (const name of workbook.SheetNames) {
+              const sheet = workbook.Sheets[name];
+              const testJson = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+              if (testJson && testJson.length > 0) {
+                worksheet = sheet;
+                break;
+              }
+            }
+            if (!worksheet && workbook.SheetNames.length > 0) {
+              worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            }
+            if (!worksheet) throw new Error('找不到有效工作表');
+
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+            const { newQuestions } = mapRowsToQuestions(jsonData, null, src.subject);
+            if (newQuestions.length === 0) throw new Error('內容為空或找不到「題目」欄位');
+            collected.push(...newQuestions);
+          } catch (e) {
+            console.warn(`讀取 ${src.file} 失敗：`, e);
+            failedSubjects.push(src.subject);
           }
         }
-        if (!worksheet && workbook.SheetNames.length > 0) {
-          worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        }
-        if (!worksheet) throw new Error('找不到有效工作表');
 
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-        const { newQuestions } = mapRowsToQuestions(jsonData, null);
-        if (newQuestions.length === 0) throw new Error('Excel 內容為空或找不到「題目」欄位');
+        if (collected.length === 0) throw new Error('所有科目的題庫都讀取失敗');
 
         const now = new Date();
         const timeStr = `${now.getMonth()+1}/${now.getDate()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+        const failNote = failedSubjects.length > 0 ? `，${failedSubjects.join('、')}讀取失敗` : '';
 
         applyLoadedQuestions(
-          newQuestions,
-          `<i class="fa-solid fa-database"></i> 題庫來源：${EXCEL_FILE_URL}（共 ${newQuestions.length} 題，更新於 ${timeStr}）`,
+          collected,
+          `<i class="fa-solid fa-database"></i> 線上題庫共 ${collected.length} 題，更新於 ${timeStr}${failNote}`,
           { saveCache: true, source: 'default', cacheTime: timeStr }
         );
 
         if (isManualRefresh) {
-          alert(`✅ 預設題庫已更新！\n共載入 ${newQuestions.length} 題`);
+          alert(`✅ 預設題庫已更新！\n共載入 ${collected.length} 題`
+            + (failedSubjects.length > 0 ? `\n（${failedSubjects.join('、')}讀取失敗）` : ''));
         }
       } catch (err) {
         console.warn('線上讀取失敗：', err);
@@ -818,7 +899,7 @@
         processQuestionCounts();
         populateFilters();
         applyFilters();
-        statusEl.innerHTML = `<i class="fa-solid fa-circle-info text-amber-300"></i> 無法載入 ${EXCEL_FILE_URL}，目前使用內建備援題目`;
+        statusEl.innerHTML = `<i class="fa-solid fa-circle-info text-amber-300"></i> 無法載入線上題庫，目前使用內建備援題目`;
         if (isManualRefresh) alert(`❌ 題庫更新失敗：${err.message || '無法讀取線上 Excel'}`);
       }
     }
@@ -837,29 +918,78 @@
       });
     }
 
+    // ---- 科目切換 ----
+    function saveCurrentSubject() {
+      try { localStorage.setItem(SUBJECT_KEY, currentSubject); } catch (e) {}
+    }
+
+    // 切換科目＝換一組題庫來練。試卷／章節／主題屬於該科，一律重設；
+    // 出現次數門檻與三個開關是跨科偏好，保留不動。
+    function switchSubject(subject) {
+      currentSubject = subject;
+      saveCurrentSubject();
+
+      document.getElementById('filterExam').value = '';
+      document.getElementById('filterChapter').value = '';
+      document.getElementById('filterTopic').value = '';
+      document.getElementById('filterKeyword').value = '';
+      // 清空後由 renderTable 依新科目的題數重填，否則會留著上一科的筆數上限
+      document.getElementById('rangeFromInput').value = '';
+      document.getElementById('rangeToInput').value = '';
+      selectedIndices.clear();
+
+      // 練習進行到一半換科目沒有意義，視為結束這一輪。
+      closePracticeSetupModal();
+      closeSessionSummaryModal();
+      populateFilters();
+      backToList();
+    }
+
     // 填入篩選清單（含由新到舊日期排序、章節與主題排序）
     function populateFilters() {
-      const courses = [...new Set(allQuestions.map(q => q.course))].filter(Boolean).sort();
-      
-      // 考古題日期：由新到舊（降冪）排序
-      const exams = [...new Set(allQuestions.map(q => String(q.exam)))].filter(Boolean).sort((a, b) => {
+      // 科目清單由題庫資料長出來，不寫死；沒有題目的科目不會出現。
+      // 排序依 EXCEL_SOURCES 的順序（第一科就是新訪客的預設科目），不在清單中的排最後。
+      const subjectOrder = s => {
+        const i = EXCEL_SOURCES.findIndex(src => src.subject === s);
+        return i === -1 ? EXCEL_SOURCES.length : i;
+      };
+      const subjects = [...new Set(allQuestions.map(q => q.course))].filter(Boolean)
+        .sort((a, b) => subjectOrder(a) - subjectOrder(b) || a.localeCompare(b));
+
+      // 上次看的科目若這次不在題庫裡（例如某科 Excel 一時讀取失敗、或手動匯入了別的題庫），
+      // 先退回第一科，但**不覆寫記憶**——否則一次讀取失敗就會把使用者的科目偏好永久改掉，
+      // 檔案修好也回不來。記憶只在使用者自己切換時更新。
+      if (!subjects.includes(currentSubject)) {
+        currentSubject = subjects[0] || '';
+      }
+
+      const switcher = document.getElementById('subjectSwitcher');
+      switcher.innerHTML = subjects.map(s =>
+        `<option value="${s}"${s === currentSubject ? ' selected' : ''}>${s}</option>`).join('');
+      // 只有一科時切換器沒有意義，藏起來。
+      switcher.classList.toggle('hidden', subjects.length < 2);
+
+      // 以下三個篩選器只列出「目前科目」的選項，否則會在行銷模式下看到財務的章節。
+      const inSubject = allQuestions.filter(q => !currentSubject || q.course === currentSubject);
+
+      // 試卷：由新到舊（降冪）排序。注意試卷識別字串不保證是日期，這裡是純文字比較。
+      const exams = [...new Set(inSubject.map(q => String(q.exam)))].filter(Boolean).sort((a, b) => {
         return b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
       });
 
       // 章節與核心主題升冪排序
-      const chapters = [...new Set(allQuestions.map(q => q.chapter))].filter(Boolean).sort((a, b) => {
+      const chapters = [...new Set(inSubject.map(q => q.chapter))].filter(Boolean).sort((a, b) => {
         return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
       });
-      const topics = [...new Set(allQuestions.map(q => q.topic))].filter(Boolean).sort();
+      const topics = [...new Set(inSubject.map(q => q.topic))].filter(Boolean).sort();
 
-      document.getElementById('filterCourse').innerHTML = '<option value="">全部課程</option>' + courses.map(c => `<option value="${c}">${c}</option>`).join('');
       document.getElementById('filterExam').innerHTML = '<option value="">全部考題</option>' + exams.map(e => `<option value="${e}">${e}</option>`).join('');
       document.getElementById('filterChapter').innerHTML = '<option value="">全部章節</option>' + chapters.map(ch => `<option value="${ch}">${ch}</option>`).join('');
       document.getElementById('filterTopic').innerHTML = '<option value="">全部主題</option>' + topics.map(t => `<option value="${t}">${t}</option>`).join('');
     }
 
     function applyFilters() {
-      const courseVal = document.getElementById('filterCourse').value;
+      const subjectVal = currentSubject;
       const examVal = document.getElementById('filterExam').value;
       const chapterVal = document.getElementById('filterChapter').value;
       const topicVal = document.getElementById('filterTopic').value;
@@ -873,7 +1003,7 @@
 
       filteredQuestions = allQuestions.filter((q, index) => {
         const key = normalizeKey(q.question);
-        const matchCourse = !courseVal || q.course === courseVal;
+        const matchSubject = !subjectVal || q.course === subjectVal;
         const matchExam = !examVal || String(q.exam) === examVal;
         const matchChapter = !chapterVal || q.chapter === chapterVal;
         const matchTopic = !topicVal || q.topic === topicVal;
@@ -888,7 +1018,7 @@
         const matchReview = !isReviewOnly || reviewSet.has(key);
         const matchUnanswered = !isUnansweredOnly || !completedSet.has(key);
 
-        if (!matchCourse || !matchExam || !matchChapter || !matchTopic || !matchCount || !matchKw || !matchReview || !matchUnanswered) return false;
+        if (!matchSubject || !matchExam || !matchChapter || !matchTopic || !matchCount || !matchKw || !matchReview || !matchUnanswered) return false;
 
         if (isDeduplicate) {
           if (seenKeys.has(key)) return false;
@@ -1286,7 +1416,7 @@
     function loadQuestionCard() {
       const q = practiceList[currentPracticePointer];
       document.getElementById('currentQuestionIndex').innerText = currentPracticePointer + 1;
-      document.getElementById('cardCourseBadge').innerText = q.course || '財務管理';
+      document.getElementById('cardCourseBadge').innerText = q.course || currentSubject || '未分類';
       document.getElementById('cardExamBadge').innerText = q.exam || '考古題';
       
       // 講義章節與核心主題標籤動態呈現
