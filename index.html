@@ -381,9 +381,9 @@
 
         <!-- 答案與解析互動區 (緊湊佈局) -->
         <div class="p-4 sm:p-5 md:p-6 space-y-4">
-          <!-- O/X 判斷作答按鈕（題庫答案格式為 O/X 時顯示，含快捷鍵 1/2 標籤） -->
+          <!-- 依答案格式顯示 O/X 或 A/B/C/D 作答按鈕 -->
           <div id="judgeButtonsBlock">
-            <div class="grid grid-cols-2 gap-3 sm:gap-4">
+            <div id="trueFalseButtons" class="grid grid-cols-2 gap-3 sm:gap-4">
               <button id="btnAnswerO" onclick="selectAnswer('O')" class="py-3 px-3 sm:py-3.5 sm:px-4 bg-white border-2 border-slate-200 hover:border-emerald-400 rounded-xl shadow-sm transition flex items-center gap-2.5 sm:gap-3 text-left">
                 <span class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-600 font-bold text-base sm:text-lg shrink-0">O</span>
                 <div>
@@ -404,6 +404,24 @@
               </button>
             </div>
 
+            <div id="multipleChoiceButtons" class="hidden">
+              <p class="text-xs text-slate-500 mb-2">請選擇答案（電腦可按 A、B、C、D）</p>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                <button id="btnAnswerA" onclick="selectAnswer('A')" aria-label="選擇 A">
+                  <span>A</span><div class="font-bold text-slate-700 text-sm sm:text-base">選項 A</div>
+                </button>
+                <button id="btnAnswerB" onclick="selectAnswer('B')" aria-label="選擇 B">
+                  <span>B</span><div class="font-bold text-slate-700 text-sm sm:text-base">選項 B</div>
+                </button>
+                <button id="btnAnswerC" onclick="selectAnswer('C')" aria-label="選擇 C">
+                  <span>C</span><div class="font-bold text-slate-700 text-sm sm:text-base">選項 C</div>
+                </button>
+                <button id="btnAnswerD" onclick="selectAnswer('D')" aria-label="選擇 D">
+                  <span>D</span><div class="font-bold text-slate-700 text-sm sm:text-base">選項 D</div>
+                </button>
+              </div>
+            </div>
+
             <!-- 作答後就近內聯回饋與「下一題」操作列（精簡排版，消除滾動！） -->
             <div id="inlineFeedbackBlock" class="hidden mt-3 p-3 sm:p-3.5 rounded-xl border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 transition-all duration-200">
               <div class="flex items-center gap-2.5">
@@ -420,7 +438,7 @@
             </div>
           </div>
 
-          <!-- 備援：題庫答案非 O/X 格式時顯示原本的「顯示標準答案」按鈕 -->
+          <!-- 備援：無法辨識標準答案時，保留顯示原始答案的功能 -->
           <div id="fallbackAnswerBlock" class="hidden">
             <button id="btnShowAnswer" onclick="toggleAnswer()" class="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow transition flex justify-between items-center text-sm">
               <span><i class="fa-solid fa-key mr-2"></i>顯示標準答案</span>
@@ -660,7 +678,7 @@
     let currentPracticePointer = 0;
     let reviewSet = new Set();
     let completedSet = new Set();   // 已作答過（任何時候）的題目，跨 session 持久化
-    let sessionAnswers = {};        // 本輪作答紀錄：{ practiceList索引: 'O' | 'X' }，換一輪練習就重置
+    let sessionAnswers = {};        // 本輪作答紀錄：{ practiceList索引: 'O' | 'X' | 'A' | 'B' | 'C' | 'D' }
 
     // UX 抽題與測驗設定狀態
     let currentOrderMode = 'random';       // 'random' | 'sequential'
@@ -1466,19 +1484,26 @@
       }
     }
 
-    // 從題庫的「答案」欄位判斷標準答案是 O 還是 X（欄位可能寫成 "X, 應選擇..." 這種格式）
+    // 支援 O/X、(A)～(D)、全形括號與答案後的補充說明。
+    // 字母後需有分隔符，避免把一般文字誤判為標準答案。
+    const ANSWER_PREFIX = /^(?:\(\s*([OXA-D])\s*\)|([OXA-D])(?=$|[\s,.:、(]))\s*[,.:、]?\s*/i;
+
     function getCorrectLetter(answerStr) {
-      if (!answerStr) return null;
-      const t = String(answerStr).trim().toUpperCase();
-      if (t.startsWith('O')) return 'O';
-      if (t.startsWith('X')) return 'X';
-      return null;
+      const t = String(answerStr || '').normalize('NFKC').trim();
+      const match = t.match(ANSWER_PREFIX);
+      return match ? (match[1] || match[2]).toUpperCase() : null;
     }
 
-    // 使用者點選 O 或 X 作答
+    function getAnswerChoices(answerStr) {
+      const letter = getCorrectLetter(answerStr);
+      if (!letter) return [];
+      return ['O', 'X'].includes(letter) ? ['O', 'X'] : ['A', 'B', 'C', 'D'];
+    }
+
+    // 點擊與鍵盤共用此入口，拒絕不屬於目前題型的作答。
     function selectAnswer(choice) {
       const q = practiceList[currentPracticePointer];
-      if (!q) return;
+      if (!q || !getAnswerChoices(q.answer).includes(choice)) return;
       const key = normalizeKey(q.question);
 
       sessionAnswers[currentPracticePointer] = choice;
@@ -1489,18 +1514,19 @@
       updateSessionStats();
     }
 
-    // 依目前題目 + 本輪作答狀態，重繪 O/X 按鈕與就近內聯回饋區塊
+    // 依目前題型與本輪作答狀態，重繪按鈕與就近內聯回饋區塊。
     function renderAnswerState() {
       const q = practiceList[currentPracticePointer];
       if (!q) return;
       const correctLetter = getCorrectLetter(q.answer);
+      const choices = getAnswerChoices(q.answer);
+      const isMultipleChoice = choices.length === 4;
       const judgeBlock = document.getElementById('judgeButtonsBlock');
       const fallbackBlock = document.getElementById('fallbackAnswerBlock');
-      const btnO = document.getElementById('btnAnswerO');
-      const btnX = document.getElementById('btnAnswerX');
       const inlineFeedbackBlock = document.getElementById('inlineFeedbackBlock');
+      if (inlineFeedbackBlock) inlineFeedbackBlock.classList.add('hidden');
 
-      // 題庫答案不是 O/X 格式時，退回原本「顯示標準答案」按鈕
+      // 無法辨識答案時，退回原本「顯示標準答案」按鈕，不記分。
       if (!correctLetter) {
         judgeBlock.classList.add('hidden');
         fallbackBlock.classList.remove('hidden');
@@ -1508,12 +1534,16 @@
       }
       judgeBlock.classList.remove('hidden');
       fallbackBlock.classList.add('hidden');
+      document.getElementById('trueFalseButtons').classList.toggle('hidden', isMultipleChoice);
+      document.getElementById('multipleChoiceButtons').classList.toggle('hidden', !isMultipleChoice);
 
       const picked = sessionAnswers[currentPracticePointer];
+      const answerButtons = choices.map(letter => [document.getElementById(`btnAnswer${letter}`), letter]);
 
       // 重置按鈕樣式
-      [[btnO, 'O'], [btnX, 'X']].forEach(([btn, letter]) => {
+      answerButtons.forEach(([btn, letter]) => {
         btn.className = 'py-3 px-3 sm:py-3.5 sm:px-4 bg-white border-2 border-slate-200 hover:border-slate-300 rounded-xl shadow-sm transition flex items-center gap-2.5 sm:gap-3 text-left';
+        btn.setAttribute('aria-pressed', String(letter === picked));
         const circle = btn.querySelector('span');
         circle.className = 'w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 font-bold text-base sm:text-lg';
       });
@@ -1525,7 +1555,7 @@
 
       const isCorrect = picked === correctLetter;
 
-      [[btnO, 'O'], [btnX, 'X']].forEach(([btn, letter]) => {
+      answerButtons.forEach(([btn, letter]) => {
         const circle = btn.querySelector('span');
         if (letter === correctLetter) {
           btn.classList.add('border-emerald-500', 'ring-2', 'ring-emerald-200');
@@ -1552,7 +1582,7 @@
       }
 
       // 補充說明（答案欄位逗號後的文字，例如 "X, 應選擇 Project B"）
-      const extra = String(q.answer || '').replace(/^[OoXx]\s*[,，]?\s*/, '').trim();
+      const extra = String(q.answer || '').normalize('NFKC').trim().replace(ANSWER_PREFIX, '').trim();
 
       if (inlineFeedbackBlock) {
         inlineFeedbackBlock.classList.remove('hidden');
@@ -1564,7 +1594,9 @@
           inlineFeedbackBlock.className = 'mt-3 p-3 sm:p-3.5 rounded-xl border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 transition-all duration-200 bg-emerald-50 border-emerald-200 text-emerald-800';
           icon.className = 'fa-solid fa-circle-check text-xl text-emerald-600 shrink-0';
           title.innerText = '答對了！';
-          if (correctLetter === 'X') {
+          if (isMultipleChoice) {
+            detail.innerText = extra ? `正確答案：${correctLetter}（${extra}）` : `正確答案：${correctLetter}`;
+          } else if (correctLetter === 'X') {
             detail.innerText = extra ? `錯誤原因：${extra}` : '此敘述與題庫答案一致';
           } else {
             detail.innerText = extra ? `此敘述與題庫答案一致（${extra}）` : '此敘述與題庫答案一致';
@@ -1573,7 +1605,7 @@
           inlineFeedbackBlock.className = 'mt-3 p-3 sm:p-3.5 rounded-xl border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 transition-all duration-200 bg-rose-50 border-rose-200 text-rose-800';
           icon.className = 'fa-solid fa-circle-xmark text-xl text-rose-600 shrink-0';
           title.innerText = `答錯了，正確答案是 ${correctLetter}`;
-          detail.innerText = extra ? extra : '此敘述與題庫答案不一致';
+          detail.innerText = extra || (isMultipleChoice ? `你選擇了 ${picked}` : '此敘述與題庫答案不一致');
         }
       }
     }
@@ -1787,17 +1819,25 @@
       // 避免在使用者打字輸入時攔截
       const activeTag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toLowerCase() : '';
       if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       const key = e.key;
       const code = e.code;
+      const q = practiceList[currentPracticePointer];
+      const choices = q ? getAnswerChoices(q.answer) : [];
 
+      // 選擇題用字母鍵作答；3/4 仍保留解析與複習功能。
+      if (/^[a-d]$/i.test(key) && choices.includes(key.toUpperCase())) {
+        e.preventDefault();
+        selectAnswer(key.toUpperCase());
+      }
       // 1: 正確 (O)
-      if (key === '1' || code === 'Numpad1') {
+      else if ((key === '1' || code === 'Numpad1') && choices.includes('O')) {
         e.preventDefault();
         selectAnswer('O');
       }
       // 2: 錯誤 (X)
-      else if (key === '2' || code === 'Numpad2') {
+      else if ((key === '2' || code === 'Numpad2') && choices.includes('X')) {
         e.preventDefault();
         selectAnswer('X');
       }
