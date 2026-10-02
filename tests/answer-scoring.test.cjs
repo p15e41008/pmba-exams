@@ -100,6 +100,25 @@ test('focused native controls retain Enter and Space while body keeps next short
   assert.equal(vm.runInContext('currentPracticePointer', app), 1);
 });
 
+test('open dialogs wrap Tab boundaries before hidden-practice shortcuts', () => {
+  const { app, press } = createApp();
+  const control = () => ({ tabIndex: 0, getClientRects: () => [1], focus() { app.document.activeElement = this; } });
+  const first = control();
+  const last = control();
+  const hidden = { ...control(), getClientRects: () => [] };
+  const disabled = { ...control(), disabled: true };
+  app.document.querySelector = () => ({ querySelectorAll: () => [first, hidden, disabled, last] });
+  app.document.getElementById('practiceViewSection').classList.add('hidden');
+  app.document.activeElement = last;
+  assert.equal(press('Tab'), 1);
+  assert.equal(app.document.activeElement, first);
+  assert.equal(press('Tab', { shiftKey: true }), 1);
+  assert.equal(app.document.activeElement, last);
+  app.document.activeElement = first;
+  assert.equal(press('Tab'), 0);
+  assert.equal(press('Escape'), 0);
+});
+
 test('summary reconciles correct, wrong and unanswered using the same answered-only accuracy', () => {
   for (const [choices, expected, perfect] of [
     [[], [0, 0, 2, '0%'], false],

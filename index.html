@@ -1836,6 +1836,20 @@
 
     // 全鍵盤快捷鍵監聽（支援標準鍵盤與右側數字小鍵盤 Numpad）
     window.addEventListener('keydown', function(e) {
+      const dialog = document.querySelector('dialog[open]');
+      if (dialog) {
+        if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          const controls = [...dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]')]
+            .filter(el => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length);
+          const first = controls[0];
+          const last = controls[controls.length - 1];
+          if (first && ((e.shiftKey && document.activeElement === first) || (!e.shiftKey && document.activeElement === last))) {
+            e.preventDefault();
+            (e.shiftKey ? last : first).focus();
+          }
+        }
+        return;
+      }
       const practiceSection = document.getElementById('practiceViewSection');
       if (!practiceSection || practiceSection.classList.contains('hidden')) return;
 
@@ -1846,11 +1860,6 @@
       if ((setupModal && setupModal.classList.contains('opacity-100')) ||
           (summaryModal && summaryModal.classList.contains('opacity-100')) ||
           (lightboxModal && lightboxModal.classList.contains('opacity-100'))) {
-        if (e.key === 'Escape') {
-          if (lightboxModal.classList.contains('opacity-100')) closeLightbox();
-          else if (setupModal.classList.contains('opacity-100')) closePracticeSetupModal();
-          else if (summaryModal.classList.contains('opacity-100')) closeSessionSummaryModal();
-        }
         return;
       }
 
