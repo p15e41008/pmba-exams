@@ -8,25 +8,45 @@ const html = readFileSync(join(__dirname, '..', 'index.html'), 'utf8');
 const appScript = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
   .map(match => match[1]).find(script => script.includes('const EXCEL_SOURCES'));
 
-function createApp() {
+function createApp(renderAnswers = false) {
   const elements = new Map();
   const saved = new Map();
+  let keydown;
   const app = vm.createContext({
-    window: { addEventListener() {} },
+    window: { addEventListener(type, handler) { if (type === 'keydown') keydown = handler; } },
     marked: { setOptions() {} },
     document: {
       getElementById(id) {
-        if (!elements.has(id)) elements.set(id, { innerText: '', style: {} });
+        if (!elements.has(id)) {
+          const classes = new Set();
+          const child = { className: '', classList: { add() {}, remove() {} } };
+          elements.set(id, {
+            innerText: '', style: {},
+            classList: {
+              contains: name => classes.has(name),
+              add: (...names) => names.forEach(name => classes.add(name)),
+              remove: (...names) => names.forEach(name => classes.delete(name)),
+              toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }
+            },
+            setAttribute(name, value) { this[name] = value; },
+            querySelector: () => child
+          });
+        }
         return elements.get(id);
       }
     },
     localStorage: { setItem: (key, value) => saved.set(key, value) }
   });
   vm.runInContext(appScript, app);
-  // These tests cover answer validation, persistence and scoring; DOM rendering
-  // is checked in the browser using the README's manual regression checklist.
-  vm.runInContext('renderAnswerState = () => {};', app);
-  return { app, elements, saved };
+  // Enable feedback state checks when needed; visual layout still needs the
+  // README's browser regression checklist.
+  if (!renderAnswers) vm.runInContext('renderAnswerState = () => {};', app);
+  const press = (key, options = {}) => {
+    let prevented = 0;
+    keydown({ key, code: '', preventDefault() { prevented++; }, ...options });
+    return prevented;
+  };
+  return { app, elements, saved, press };
 }
 
 test('parses existing O/X and multiple-choice answers with common formatting', () => {
@@ -96,4 +116,85 @@ test('wrong-type and unknown answers cannot mark a question as completed', () =>
   assert.equal(vm.runInContext('Object.keys(sessionAnswers).length', app), 0);
   assert.equal(vm.runInContext('completedSet.size', app), 0);
   assert.equal(saved.size, 0);
+});
+
+test('both shortcut groups share scoring, feedback and mistake retry, once per keypress', () => {
+  for (const [key, choice] of [
+    ['a', 'A'], ['z', 'A'], ['b', 'B'], ['x', 'B'], ['c', 'C'], ['d', 'D'], ['v', 'D']
+  ]) {
+    for (const letter of [key, key.toUpperCase()]) {
+      const { app, elements, press } = createApp(true);
+      vm.runInContext(`practiceList = [{ question: '選擇題', answer: '(C)' }];
+        let answerCalls = 0;
+        const originalSelectAnswer = selectAnswer;
+        selectAnswer = choice => { answerCalls++; originalSelectAnswer(choice); };
+        showPracticeView = () => {};`, app);
+      assert.equal(press(letter), 1);
+      assert.equal(vm.runInContext('answerCalls', app), 1);
+      assert.equal(vm.runInContext('sessionAnswers[0]', app), choice);
+      assert.equal(elements.get('sessionAnsweredCount').innerText, 1);
+      assert.equal(elements.get('sessionCorrectCount').innerText, choice === 'C' ? 1 : 0);
+      assert.equal(elements.get('feedbackTitle').innerText, choice === 'C' ? '答對了！' : '答錯了，正確答案是 C');
+      assert.equal(press(letter, { repeat: true }), 1);
+      assert.equal(vm.runInContext('answerCalls', app), 1);
+      if (choice !== 'C') {
+        assert.equal(vm.runInContext('sessionMistakes[0].userChoice', app), choice);
+        app.retryMistakesOnly();
+        assert.equal(vm.runInContext('practiceList[0].answer', app), '(C)');
+        press('C');
+        assert.equal(elements.get('sessionCorrectCount').innerText, 1);
+        assert.equal(vm.runInContext('sessionMistakes.length', app), 0);
+      }
+    }
+  }
+});
+
+test('shortcuts ignore editable fields, modals, modifiers and the hidden practice view', () => {
+  const { app, saved, press } = createApp();
+  vm.runInContext("practiceList = [{ question: '選擇題', answer: '(A)' }];", app);
+  for (const activeElement of [
+    { tagName: 'INPUT' }, { tagName: 'TEXTAREA' }, { tagName: 'SELECT' },
+    { tagName: 'DIV', isContentEditable: true }
+  ]) {
+    app.document.activeElement = activeElement;
+    for (const key of ['a', 'z', 'b', 'x', 'c', 'd', 'v']) assert.equal(press(key), 0);
+  }
+  app.document.activeElement = null;
+  for (const modifier of ['ctrlKey', 'metaKey', 'altKey']) {
+    for (const key of ['a', 'z', 'b', 'x', 'c', 'd', 'v']) assert.equal(press(key, { [modifier]: true }), 0);
+  }
+  for (const id of ['practiceSetupModal', 'sessionSummaryModal', 'lightboxModal', 'practiceViewSection']) {
+    const element = app.document.getElementById(id);
+    const blockClass = id === 'practiceViewSection' ? 'hidden' : 'opacity-100';
+    element.classList.add(blockClass);
+    for (const key of ['a', 'z', 'b', 'x', 'c', 'd', 'v']) assert.equal(press(key), 0);
+    element.classList.remove(blockClass);
+  }
+  assert.equal(saved.size, 0);
+  assert.equal(vm.runInContext('Object.keys(sessionAnswers).length', app), 0);
+});
+
+test('choice aliases cannot answer true/false or unknown questions; other shortcuts still work', () => {
+  const { app, press } = createApp();
+  for (const answer of ['O', 'X', '無標準答案']) {
+    app.answer = answer;
+    vm.runInContext("practiceList = [{ question: '題目', answer }]; sessionAnswers = {};", app);
+    for (const key of ['a', 'z', 'b', 'x', 'c', 'd', 'v', 'A', 'Z', 'B', 'X', 'C', 'D', 'V']) {
+      assert.equal(press(key), 0);
+    }
+    assert.equal(vm.runInContext('Object.keys(sessionAnswers).length', app), 0);
+    if (answer !== '無標準答案') {
+      press('1');
+      assert.equal(vm.runInContext('sessionAnswers[0]', app), 'O');
+      press('2');
+      assert.equal(vm.runInContext('sessionAnswers[0]', app), 'X');
+    }
+  }
+  vm.runInContext(`let actions = [];
+    toggleExplanation = () => actions.push('explanation');
+    toggleCurrentCardReview = () => actions.push('review');
+    nextQuestion = () => actions.push('next');
+    prevQuestion = () => actions.push('previous');`, app);
+  for (const key of ['3', '4', '0', 'Enter', ' ', 'Backspace']) assert.equal(press(key), 1);
+  assert.deepEqual(Array.from(vm.runInContext('actions', app)), ['explanation', 'review', 'next', 'next', 'next', 'previous']);
 });

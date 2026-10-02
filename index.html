@@ -405,7 +405,7 @@
             </div>
 
             <div id="multipleChoiceButtons" class="hidden">
-              <p class="text-xs text-slate-500 mb-2">請選擇答案（電腦可按 A、B、C、D）</p>
+              <p class="text-xs text-slate-500 mb-2">請選擇答案（電腦快捷鍵：A/Z、B/X、C、D/V）</p>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <button id="btnAnswerA" onclick="selectAnswer('A')" aria-label="選擇 A">
                   <span>A</span><div class="font-bold text-slate-700 text-sm sm:text-base">選項 A</div>
@@ -562,6 +562,7 @@
           <div class="grid grid-cols-2 gap-x-2 gap-y-1.5 text-slate-600 text-[11px]">
             <div><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-mono font-bold text-indigo-600">1</kbd> 正確 (O)</div>
             <div><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-mono font-bold text-rose-600">2</kbd> 錯誤 (X)</div>
+            <div class="col-span-2">選擇題：A/Z、B/X、C、D/V（大小寫皆可）</div>
             <div><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-mono font-bold text-slate-700">3</kbd> 展開/收合解析</div>
             <div><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-mono font-bold text-slate-700">4</kbd> 註記/取消複習</div>
             <div class="col-span-2 text-indigo-700 pt-0.5 font-medium"><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-mono font-bold">0</kbd> 或 <kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-mono font-bold">Enter</kbd> / <kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-mono font-bold">Space</kbd> 下一題</div>
@@ -1819,6 +1820,7 @@
       // 避免在使用者打字輸入時攔截
       const activeTag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toLowerCase() : '';
       if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return;
+      if (document.activeElement && document.activeElement.isContentEditable) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       const key = e.key;
@@ -1826,10 +1828,11 @@
       const q = practiceList[currentPracticePointer];
       const choices = q ? getAnswerChoices(q.answer) : [];
 
-      // 選擇題用字母鍵作答；3/4 仍保留解析與複習功能。
-      if (/^[a-d]$/i.test(key) && choices.includes(key.toUpperCase())) {
+      // 兩組選擇題快捷鍵共用作答入口；3/4 仍保留解析與複習功能。
+      const choice = ({ A: 'A', Z: 'A', B: 'B', X: 'B', C: 'C', D: 'D', V: 'D' })[key.toUpperCase()];
+      if (choices.length === 4 && choices.includes(choice)) {
         e.preventDefault();
-        selectAnswer(key.toUpperCase());
+        if (!e.repeat) selectAnswer(choice);
       }
       // 1: 正確 (O)
       else if ((key === '1' || code === 'Numpad1') && choices.includes('O')) {
