@@ -283,6 +283,32 @@ test('clearing completed records persists across reload, preserves reviews and a
   assert.deepEqual(JSON.parse(saved.get('fin_management_completed_v1')), ['題一']);
 });
 
+test('restarting with the same settings keeps an accepted order switch and ignores a canceled switch', () => {
+  const { app } = createApp();
+  vm.runInContext(`allQuestions = [
+    { question: '題一', answer: 'O', num: 1 }, { question: '題二', answer: 'X', num: 2 }
+  ]; selectedIndices = new Set([0, 1]); currentLimitCount = 1;
+  showPracticeView = () => {}; loadQuestionCard = () => {};`, app);
+  app.confirmStartPractice();
+  app.selectAnswer('O');
+  const originalConfig = vm.runInContext('JSON.stringify(lastPracticeConfig)', app);
+  app.confirm = () => false;
+  app.toggleOrderModeInPractice();
+  assert.equal(vm.runInContext('JSON.stringify(lastPracticeConfig)', app), originalConfig);
+  app.restartSamePractice();
+  assert.equal(vm.runInContext('currentOrderMode', app), 'random');
+  app.selectAnswer('O');
+  app.confirm = () => true;
+  app.toggleOrderModeInPractice();
+  app.restartSamePractice();
+  assert.equal(vm.runInContext('currentOrderMode', app), 'sequential');
+  assert.equal(vm.runInContext('practiceList.length', app), 1);
+  assert.deepEqual(Array.from(vm.runInContext('lastPracticeConfig.selectedIndicesSnapshot', app)), [0, 1]);
+  app.toggleOrderModeInPractice();
+  app.restartSamePractice();
+  assert.equal(vm.runInContext('currentOrderMode', app), 'random');
+});
+
 test('switching practice order requires confirmation before resetting any session state', () => {
   const { app, elements, saved } = createApp(true);
   vm.runInContext(`practiceList = [

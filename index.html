@@ -1401,6 +1401,7 @@
         currentOrderMode = 'random';
         practiceList = shuffleArray(practiceList);
       }
+      if (lastPracticeConfig) lastPracticeConfig.orderMode = currentOrderMode;
       currentPracticePointer = 0;
       sessionAnswers = {};
       sessionMistakes = [];
