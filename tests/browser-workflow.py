@@ -189,6 +189,15 @@ def exercise(page, width, suffix):
     page.locator('#btnAnswerO').focus()
     page.keyboard.press('Enter')
     expect(page.locator('#sessionCorrectCount')).to_have_text('1')
+    # Confirmed order changes become the settings used by the next round.
+    page.once('dialog', lambda dialog: dialog.accept())
+    page.locator('#badgePracticeMode').click()
+    expect(page.locator('#badgePracticeModeText')).to_contain_text('隨機')
+    page.locator('body').click(position={'x': 1, 'y': 1})
+    page.keyboard.press('0')
+    page.keyboard.press('0')
+    page.locator('button[onclick="restartSamePractice()"]').click()
+    expect(page.locator('#badgePracticeModeText')).to_contain_text('隨機')
     assert not errors, errors
     print(f'{suffix}: settings, selection, focused answers, lightbox, order cancel, shortcuts, summary, review persistence and clear persistence passed')
 
