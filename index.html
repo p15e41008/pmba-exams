@@ -313,7 +313,7 @@
             <i class="fa-solid fa-arrow-left"></i> 返回清單
           </button>
           <!-- 練習模式切換標籤 -->
-          <button id="badgePracticeMode" onclick="toggleOrderModeInPractice()" class="text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 transition bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" title="點擊可切換順序/隨機抽題">
+          <button id="badgePracticeMode" onclick="toggleOrderModeInPractice()" class="text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 transition bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" title="切換順序／隨機抽題會重新開始本輪練習">
             <i id="badgePracticeModeIcon" class="fa-solid fa-shuffle"></i>
             <span id="badgePracticeModeText">隨機亂序</span>
           </button>
@@ -602,16 +602,18 @@
             <div id="summaryCorrectCount" class="text-lg sm:text-xl font-bold text-emerald-600 mt-0.5">0</div>
           </div>
           <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-            <div class="text-[10px] sm:text-[11px] text-slate-400 font-semibold uppercase">正確率</div>
+            <div class="text-[10px] sm:text-[11px] text-slate-400 font-semibold uppercase">作答正確率</div>
             <div id="summaryAccuracy" class="text-lg sm:text-xl font-bold text-amber-600 mt-0.5">0%</div>
           </div>
         </div>
+
+        <p class="text-xs text-center text-slate-500">答錯 <span id="summaryWrongCount">0</span> 題・未作答 <span id="summaryUnansweredCount">0</span> 題（作答正確率＝答對／已作答）</p>
 
         <!-- 本輪錯題區塊 -->
         <div id="summaryMistakesBlock" class="border border-rose-200 bg-rose-50/50 rounded-xl p-3 sm:p-3.5 space-y-2">
           <div class="flex items-center justify-between text-xs font-bold text-rose-800">
             <span class="flex items-center gap-1.5"><i class="fa-solid fa-circle-exclamation text-rose-600"></i> 本輪答錯題目 (<span id="summaryMistakeCount">0</span> 題)</span>
-            <span class="text-[11px] text-rose-500">已自動記錄</span>
+            <span class="text-[11px] text-rose-500">複習標記已保存；詳細作答僅留本輪</span>
           </div>
           <div id="summaryMistakesList" class="max-h-32 overflow-y-auto space-y-1.5 text-xs text-slate-600 pr-1"></div>
         </div>
@@ -1009,7 +1011,7 @@
       document.getElementById('filterTopic').innerHTML = '<option value="">全部主題</option>' + topics.map(t => `<option value="${t}">${t}</option>`).join('');
     }
 
-    function applyFilters() {
+    function applyFilters(preserveSelection = false) {
       const subjectVal = currentSubject;
       const examVal = document.getElementById('filterExam').value;
       const chapterVal = document.getElementById('filterChapter').value;
@@ -1018,6 +1020,7 @@
       const keywordVal = document.getElementById('filterKeyword').value.trim().toLowerCase();
       const isDeduplicate = document.getElementById('chkDeduplicate').checked;
       const isReviewOnly = document.getElementById('chkReviewOnly').checked;
+      if (isReviewOnly) document.getElementById('chkUnansweredOnly').checked = false;
       const isUnansweredOnly = document.getElementById('chkUnansweredOnly').checked;
 
       const seenKeys = new Set();
@@ -1051,7 +1054,9 @@
       });
 
       updateReviewCountBadge();
-      selectedIndices = new Set(filteredQuestions.map(q => q._originalIndex));
+      selectedIndices = new Set(filteredQuestions
+        .filter(q => !preserveSelection || selectedIndices.has(q._originalIndex))
+        .map(q => q._originalIndex));
       renderTable();
     }
 
@@ -1131,7 +1136,7 @@
         reviewSet.add(key);
       }
       saveReviews();
-      applyFilters();
+      applyFilters(true);
     }
 
     function toggleCurrentCardReview() {
@@ -1169,7 +1174,7 @@
       if (confirm('確定要清空所有「需複習」的註記嗎？')) {
         reviewSet.clear();
         saveReviews();
-        applyFilters();
+        applyFilters(true);
       }
     }
 
@@ -1181,6 +1186,7 @@
     function clearAllCompletedFlags() {
       if (confirm('確定要清空所有「已作答」紀錄嗎？（不會影響複習標記）')) {
         completedSet.clear();
+        saveCompleted();
         applyFilters();
       }
     }
@@ -1367,6 +1373,7 @@
     }
 
     function toggleOrderModeInPractice() {
+      if (Object.keys(sessionAnswers).length > 0 && !confirm('切換順序將重新開始本輪練習，清空本輪答案與計分。確定要切換嗎？（保留已作答紀錄與複習標記）')) return;
       if (currentOrderMode === 'random') {
         currentOrderMode = 'sequential';
         // 改為依原題號/序號排序
@@ -1510,6 +1517,12 @@
       sessionAnswers[currentPracticePointer] = choice;
       completedSet.add(key);
       saveCompleted();
+      if (choice !== getCorrectLetter(q.answer)) {
+        reviewSet.add(key);
+        saveReviews();
+        applyFilters(true);
+        updateCardReviewButton();
+      }
 
       renderAnswerState();
       updateSessionStats();
@@ -1611,10 +1624,10 @@
       }
     }
 
-    // 重新計算並更新本輪成績統計（答對數 / 已作答數 / 正確率 / 進度條）
-    function updateSessionStats() {
+    function getSessionStats() {
       const total = practiceList.length;
-      const answeredEntries = Object.entries(sessionAnswers);
+      const answeredEntries = Object.entries(sessionAnswers).filter(([idx, choice]) =>
+        practiceList[idx] && getAnswerChoices(practiceList[idx].answer).includes(choice));
       const answeredCount = answeredEntries.length;
       let correctCount = 0;
       answeredEntries.forEach(([idx, choice]) => {
@@ -1622,7 +1635,13 @@
         if (q && getCorrectLetter(q.answer) === choice) correctCount++;
       });
       const accuracy = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
+      return { total, answeredCount, correctCount, wrongCount: answeredCount - correctCount,
+        unansweredCount: total - answeredCount, accuracy };
+    }
 
+    // 練習畫面與結算共用「答對／已作答」，未知答案計入未作答。
+    function updateSessionStats() {
+      const { total, answeredCount, correctCount, accuracy } = getSessionStats();
       document.getElementById('sessionAnsweredCount').innerText = answeredCount;
       document.getElementById('sessionCorrectCount').innerText = correctCount;
       document.getElementById('sessionAccuracy').innerText = accuracy;
@@ -1706,17 +1725,12 @@
     // 測驗結算成績單 Modal 控制
     function openSessionSummaryModal() {
       const modal = document.getElementById('sessionSummaryModal');
-      const total = practiceList.length;
-      const answeredEntries = Object.entries(sessionAnswers);
-      let correctCount = 0;
-      answeredEntries.forEach(([idx, choice]) => {
-        const q = practiceList[idx];
-        if (q && getCorrectLetter(q.answer) === choice) correctCount++;
-      });
-      const accuracy = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+      const { total, correctCount, wrongCount, unansweredCount, accuracy } = getSessionStats();
 
       document.getElementById('summaryTotalCount').innerText = total;
       document.getElementById('summaryCorrectCount').innerText = correctCount;
+      document.getElementById('summaryWrongCount').innerText = wrongCount;
+      document.getElementById('summaryUnansweredCount').innerText = unansweredCount;
       document.getElementById('summaryAccuracy').innerText = `${accuracy}%`;
 
       const mistakesBlock = document.getElementById('summaryMistakesBlock');
@@ -1745,14 +1759,15 @@
         trophyIcon.innerHTML = '<i class="fa-solid fa-flag-checkered"></i>';
         trophyIcon.className = 'w-14 h-14 mx-auto rounded-full bg-indigo-400/20 text-indigo-300 flex items-center justify-center text-3xl mb-2.5 shadow-inner';
         heading.innerText = '本輪練習結束！';
-        subheading.innerText = `答對率 ${accuracy}%，有 ${sessionMistakes.length} 題需再加強`;
+        subheading.innerText = `作答正確率 ${accuracy}%，答錯 ${wrongCount} 題，未作答 ${unansweredCount} 題`;
       } else {
         mistakesBlock.classList.add('hidden');
         btnRetry.classList.add('hidden');
-        trophyIcon.innerHTML = '<i class="fa-solid fa-trophy"></i>';
+        const isPerfect = total > 0 && correctCount === total;
+        trophyIcon.innerHTML = isPerfect ? '<i class="fa-solid fa-trophy"></i>' : '<i class="fa-solid fa-flag-checkered"></i>';
         trophyIcon.className = 'w-14 h-14 mx-auto rounded-full bg-yellow-400/20 text-yellow-300 flex items-center justify-center text-3xl mb-2.5 shadow-inner';
-        heading.innerText = '太神了！滿分通過！';
-        subheading.innerText = `全部 ${total} 題全數答對，無懈可擊！`;
+        heading.innerText = isPerfect ? '太神了！滿分通過！' : '本輪練習結束！';
+        subheading.innerText = isPerfect ? `全部 ${total} 題全數答對，無懈可擊！` : `作答正確率 ${accuracy}%，答錯 ${wrongCount} 題，未作答 ${unansweredCount} 題`;
       }
 
       modal.classList.remove('opacity-0', 'pointer-events-none');
