@@ -15,12 +15,16 @@ function createApp(renderAnswers = false, saved = new Map()) {
     window: { scrollTo() {}, addEventListener(type, handler) { if (type === 'keydown') keydown = handler; } },
     marked: { setOptions() {} },
     document: {
+      getElementsByName() { return []; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
       getElementById(id) {
         if (!elements.has(id)) {
           const classes = new Set();
           const child = { className: '', classList: { add() {}, remove() {} } };
           elements.set(id, {
             innerText: '', value: '', checked: false, style: {},
+            open: false, showModal() { this.open = true; }, close() { this.open = false; }, focus() {},
             classList: {
               contains: name => classes.has(name),
               add: (...names) => names.forEach(name => classes.add(name)),
@@ -35,6 +39,7 @@ function createApp(renderAnswers = false, saved = new Map()) {
       }
     },
     confirm: () => true,
+    alert() {},
     localStorage: { getItem: key => saved.get(key) || null, setItem: (key, value) => saved.set(key, value) }
   });
   vm.runInContext(appScript, app);
@@ -61,6 +66,38 @@ test('parses existing O/X and multiple-choice answers with common formatting', (
   for (const answer of [null, '', '無標準答案', 'Answer unknown', 'Discuss', 'Other', '(E)']) {
     assert.equal(app.getCorrectLetter(answer), null, String(answer));
   }
+});
+
+test('start uses page settings directly and repeat restores its original selected pool', () => {
+  const { app, elements } = createApp();
+  vm.runInContext(`allQuestions = [
+    { question: '一', answer: 'O', count: 1 }, { question: '二', answer: 'X', count: 1 }
+  ]; currentOrderMode = 'sequential'; showPracticeView = () => {};`, app);
+  app.applyFilters();
+  app.startPractice();
+  assert.equal(elements.get('practiceSetupModal').open, false);
+  assert.equal(vm.runInContext('practiceList.length', app), 2);
+  app.document.getElementById('chkUnansweredOnly').checked = true;
+  app.selectAnswer('X');
+  assert.equal(vm.runInContext('selectedIndices.size', app), 1);
+  app.restartSamePractice();
+  assert.equal(vm.runInContext('practiceList.length', app), 2);
+  assert.equal(vm.runInContext('currentOrderMode', app), 'sequential');
+});
+
+test('focused native controls retain Enter and Space while body keeps next shortcuts', () => {
+  const { app, press } = createApp();
+  vm.runInContext(`practiceList = [{ question: '一', answer: 'O' }, { question: '二', answer: 'X' }];
+    loadQuestionCard = () => {};`, app);
+  for (const tagName of ['BUTTON', 'A', 'SUMMARY']) {
+    app.document.activeElement = { tagName };
+    assert.equal(press('Enter'), 0);
+    assert.equal(press(' '), 0);
+    assert.equal(vm.runInContext('currentPracticePointer', app), 0);
+  }
+  app.document.activeElement = { tagName: 'BODY' };
+  assert.equal(press('Enter'), 1);
+  assert.equal(vm.runInContext('currentPracticePointer', app), 1);
 });
 
 test('summary reconciles correct, wrong and unanswered using the same answered-only accuracy', () => {
