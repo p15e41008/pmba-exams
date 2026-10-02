@@ -14,3 +14,7 @@ owner: session-park
 - watchpoint：`_archive/` 是否真的未被 Pages 發佈（合併後驗 404）— 正典 `README.md > 二、維護說明 > 歷史版本`
 - watchpoint：窄螢幕實機版面尚未驗證 — 正典 `README.md > 三、開發者測試指引`
 - pending external：共用密碼為 placeholder，Sean 未定案 — 正典 `docs/adr/0001-static-password-is-a-curtain-not-a-lock.md`
+
+## 待合併分支（2026-10-02）
+
+[PR #6](https://github.com/p15e41008/pmba-exams/pull/6) 整合 #5、#7–#13：直接開始、錯答複習、結算與鍵盤／彈窗修正，2026-10-05 起才可合併。此段不代表已部署；契約見 `docs/specs/issue-batch.md`，驗證見 `docs/evidence/pr6/validation.md`。
