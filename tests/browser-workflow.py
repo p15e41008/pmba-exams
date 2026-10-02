@@ -40,7 +40,7 @@ def exercise(page, width, suffix):
     enter(page)
     expect(page.locator('#advancedFilters')).not_to_have_attribute('open', '')
     expect(page.locator('dialog[open]')).to_have_count(0)
-    page.screenshot(path=str(OUTPUT / f'after-{suffix}.png'))
+    page.screenshot(path=str(OUTPUT / f'after-{suffix}.png'), animations='disabled')
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'horizontal overflow'
 
     # Settings remain secondary; native modal keeps focus inside and returns it.
@@ -137,7 +137,7 @@ def exercise(page, width, suffix):
     for key in ['Tab'] * 8 + ['Shift+Tab'] * 8:
         page.keyboard.press(key)
         assert_focus_inside(page, 'sessionSummaryModal')
-    page.screenshot(path=str(OUTPUT / f'after-summary-{suffix}.png'))
+    page.screenshot(path=str(OUTPUT / f'after-summary-{suffix}.png'), animations='disabled')
     page.keyboard.press('Escape')
     expect(page.locator('dialog[open]')).to_have_count(0)
     expect(next_button).to_be_focused()
@@ -202,9 +202,9 @@ with sync_playwright() as p:
     expect(fresh.locator('#subjectSwitcher option')).to_have_count(3, timeout=60000)
     assert fresh.locator('#advancedFilters').count() == 1, 'advanced controls must be collapsed by default'
     expect(fresh.locator('#advancedFilters')).not_to_have_attribute('open', '')
-    fresh.screenshot(path=str(OUTPUT / 'after-first-load.png'))
+    fresh.screenshot(path=str(OUTPUT / 'after-first-load.png'), animations='disabled')
     fresh.set_viewport_size({'width': 390, 'height': 844})
-    fresh.screenshot(path=str(OUTPUT / 'after-first-load-mobile.png'))
+    fresh.screenshot(path=str(OUTPUT / 'after-first-load-mobile.png'), animations='disabled')
     print('fresh official question-bank load: passed')
     fresh.close()
     for width, height, suffix in [(1280, 900, 'desktop'), (390, 844, 'mobile')]:
