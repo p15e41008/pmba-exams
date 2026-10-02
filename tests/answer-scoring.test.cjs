@@ -83,6 +83,18 @@ test('start uses page settings directly and repeat restores its original selecte
   app.restartSamePractice();
   assert.equal(vm.runInContext('practiceList.length', app), 2);
   assert.equal(vm.runInContext('currentOrderMode', app), 'sequential');
+  app.document.getElementById('chkReviewOnly').checked = true;
+  vm.runInContext("reviewSet.clear();", app);
+  app.applyFilters();
+  let message = '';
+  app.alert = text => { message = text; };
+  app.startPractice();
+  assert.match(message, /沒有需複習標記/);
+  vm.runInContext("reviewSet.add(normalizeKey('一'));", app);
+  app.document.getElementById('filterKeyword').value = '沒有這題';
+  app.applyFilters();
+  app.startPractice();
+  assert.match(message, /解除進階篩選/);
 });
 
 test('focused native controls retain Enter and Space while body keeps next shortcuts', () => {

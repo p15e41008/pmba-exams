@@ -1261,9 +1261,15 @@
     // 開始練習直接套用本頁設定。
     function startPractice() {
       if (selectedIndices.size === 0) {
-        alert(filteredQuestions.length === 0
-          ? (document.getElementById('chkReviewOnly').checked ? '目前沒有符合條件的需複習題，請標記題目或解除進階篩選。' : '目前沒有符合條件的題目，請解除篩選或關閉「尚未作答」。')
-          : '請在進階篩選中勾選題目，或按「全選」。');
+        let message = '請在進階篩選中勾選題目，或按「全選」。';
+        if (filteredQuestions.length === 0) {
+          message = '目前沒有符合條件的題目，請解除篩選或關閉「尚未作答」。';
+          if (document.getElementById('chkReviewOnly').checked) {
+            const hasReviews = allQuestions.some(q => (!currentSubject || q.course === currentSubject) && reviewSet.has(normalizeKey(q.question)));
+            message = hasReviews ? '目前沒有符合條件的需複習題，請解除進階篩選。' : '目前這個題庫沒有需複習標記，請先標記題目；答錯也會自動加入複習。';
+          }
+        }
+        alert(message);
         return;
       }
       confirmStartPractice();
