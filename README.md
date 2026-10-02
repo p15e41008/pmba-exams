@@ -82,6 +82,8 @@ GitHub Pages 會自動重新發佈，同學下次開站就會拿到新版，他�
 
 ## 三、開發者測試指引 (Testing Guide)
 
+啟動 `uv run --python 3.13 run_server.py` 的 8080 伺服器後，可執行 `uv run --python 3.13 --script tests/browser-workflow.py` 驗證桌面與手機鍵盤流程；使用隔離 Chrome 與 uv 暫存的 Playwright，無需新增網站或 npm 依賴。
+
 答案辨識與計分的自動回歸測試（Node.js 18+，免安裝套件）：
 
 ```bash
