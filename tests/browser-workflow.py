@@ -211,6 +211,7 @@ with sync_playwright() as p:
     expect(fresh.locator('#subjectSwitcher option')).to_have_count(3, timeout=60000)
     assert fresh.locator('#advancedFilters').count() == 1, 'advanced controls must be collapsed by default'
     expect(fresh.locator('#advancedFilters')).not_to_have_attribute('open', '')
+    expect(fresh.locator('#chkUnansweredOnly')).not_to_be_checked()
     fresh.screenshot(path=str(OUTPUT / 'after-first-load.png'), animations='disabled')
     fresh.set_viewport_size({'width': 390, 'height': 844})
     fresh.screenshot(path=str(OUTPUT / 'after-first-load-mobile.png'), animations='disabled')

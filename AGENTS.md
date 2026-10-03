@@ -25,7 +25,7 @@ node --test tests/answer-scoring.test.cjs
 ## 工作規則
 
 - 沿用修改區域格式與命名；文字檔 UTF-8 without BOM，重用現有函式，保持修改範圍集中。
-- GitHub issue／PR 的例行建立、編輯與標籤操作，依已授權任務直接執行；本專案不採外部 API 寫入一律先問的預設。
+- GitHub issue／PR 的例行建立、編輯與標籤操作，依已授權任務直接執行；本專案不採外部 API 寫入一律先問的預設。合併 PR 是例外，每次都先問 Sean。
 - Commit 僅在使用者明確要求時執行，格式 `type(scope): 中文描述`；開始修改及提交前查 `git status`，保留他人變更。
 - 共用密碼是公開原始碼中的「門簾」；修改相關行為先讀 `docs/adr/0001-static-password-is-a-curtain-not-a-lock.md`，機密資料留在 repo 外。
 - 查部署狀態與已知限制讀 `docs/current-status.md`；涉及狀態判斷時再核對最新 GitHub 資料。
