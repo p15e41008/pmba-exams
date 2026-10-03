@@ -17,4 +17,4 @@ owner: session-park
 
 ## 待合併分支（2026-10-02）
 
-[PR #6](https://github.com/p15e41008/pmba-exams/pull/6) 整合 #5、#7–#13：直接開始、錯答複習、結算與鍵盤／彈窗修正，2026-10-05 起才可合併。此段不代表已部署；契約見 `docs/specs/issue-batch.md`，驗證見 `docs/evidence/pr6/validation.md`。
+[PR #6](https://github.com/p15e41008/pmba-exams/pull/6) 整合 #5、#7–#13：直接開始、錯答複習、結算與鍵盤／彈窗修正，行銷期末考結束後才可合併。此段不代表已部署；契約見 `docs/specs/issue-batch.md`，驗證見 `docs/evidence/pr6/validation.md`。

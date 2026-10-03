@@ -1,6 +1,6 @@
 # 既有 issues 接入 Matt
 
-更新：2026-10-02。Matt setup 已完成；八張既有 issue 保留原編號與驗收，由 [PR #6](https://github.com/p15e41008/pmba-exams/pull/6) 整合審查，2026-10-05 起才可合併。
+更新：2026-10-02。Matt setup 已完成；八張既有 issue 保留原編號與驗收，由 [PR #6](https://github.com/p15e41008/pmba-exams/pull/6) 整合審查，行銷期末考結束後才可合併。
 
 ## 正典入口
 
